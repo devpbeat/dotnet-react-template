@@ -176,7 +176,17 @@ app.UseAuthorization();
 app.UseMiddleware<AuditMiddleware>();
 
 // Map Hangfire Dashboard
-app.MapHangfireDashboard("/hangfire");
+if (app.Environment.IsDevelopment())
+{
+    app.MapHangfireDashboard("/hangfire", new DashboardOptions
+    {
+        Authorization = new[] { new HangfireAuthorizationFilter() }
+    });
+}
+else
+{
+    app.MapHangfireDashboard("/hangfire");
+}
 
 // Map API Endpoints
 app.MapAuthEndpoints();

@@ -4,6 +4,37 @@ public static class SecretsExtensions
 {
     public static async Task<WebApplicationBuilder> ConfigureSecretsAsync(this WebApplicationBuilder builder)
     {
+        // Load .env file if it exists (for local development)
+        var root = Directory.GetCurrentDirectory();
+        var dotenv = Path.Combine(root, "../../.env");
+        if (File.Exists(dotenv))
+        {
+            foreach (var line in File.ReadAllLines(dotenv))
+            {
+                var parts = line.Split('=', 2);
+                if (parts.Length != 2) continue;
+                var key = parts[0].Trim();
+                var value = parts[1].Trim();
+                Environment.SetEnvironmentVariable(key, value);
+            }
+        }
+        else 
+        {
+             // Try looking in the current directory (for when running from root)
+             dotenv = Path.Combine(root, ".env");
+             if (File.Exists(dotenv))
+             {
+                foreach (var line in File.ReadAllLines(dotenv))
+                {
+                    var parts = line.Split('=', 2);
+                    if (parts.Length != 2) continue;
+                    var key = parts[0].Trim();
+                    var value = parts[1].Trim();
+                    Environment.SetEnvironmentVariable(key, value);
+                }
+             }
+        }
+
         var useInfisical = Environment.GetEnvironmentVariable("USE_INFISICAL")?.ToLower() == "true";
 
         if (useInfisical)
