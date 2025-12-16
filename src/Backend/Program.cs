@@ -129,6 +129,7 @@ builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Progr
 // Register repositories
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
 
 // Register application services
 builder.Services.AddScoped<IBancardService, BancardService>();
@@ -192,6 +193,7 @@ else
 app.MapAuthEndpoints();
 app.MapBillingEndpoints();
 app.MapExampleEndpoints();
+app.MapCustomerEndpoints();
 
 // Register Hangfire recurring jobs
 app.RegisterRecurringJobs();

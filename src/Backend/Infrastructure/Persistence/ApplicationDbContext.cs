@@ -15,6 +15,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PaymentAttempt> PaymentAttempts { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<Customer> Customers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +27,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<PaymentMethod>().HasQueryFilter(e => e.DeletedAt == null);
         modelBuilder.Entity<PaymentAttempt>().HasQueryFilter(e => e.DeletedAt == null);
         modelBuilder.Entity<RefreshToken>().HasQueryFilter(e => e.DeletedAt == null);
+        modelBuilder.Entity<Customer>().HasQueryFilter(e => e.DeletedAt == null);
 
         // Configure relationships and constraints here if needed
         modelBuilder.Entity<User>()
