@@ -28,11 +28,24 @@ public class TokenService : ITokenService
 
     public string GenerateAccessToken(User user)
     {
-        var jwtSettings = _configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT Secret Key not configured");
-        var issuer = jwtSettings["Issuer"] ?? "DotnetReactTemplate";
-        var audience = jwtSettings["Audience"] ?? "DotnetReactTemplateUsers";
-        var accessTokenExpirationMinutes = int.Parse(jwtSettings["AccessTokenExpirationMinutes"] ?? "15");
+        // Load from environment variables first, fall back to appsettings.json
+        var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+            ?? _configuration.GetSection("JwtSettings")["SecretKey"]
+            ?? throw new InvalidOperationException("JWT Secret Key not configured");
+
+        var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER")
+            ?? _configuration.GetSection("JwtSettings")["Issuer"]
+            ?? "DotnetReactTemplate";
+
+        var audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE")
+            ?? _configuration.GetSection("JwtSettings")["Audience"]
+            ?? "DotnetReactTemplateUsers";
+
+        var accessTokenExpiration = Environment.GetEnvironmentVariable("JWT_ACCESS_TOKEN_EXPIRATION_MINUTES")
+            ?? _configuration.GetSection("JwtSettings")["AccessTokenExpirationMinutes"]
+            ?? "15";
+
+        var accessTokenExpirationMinutes = int.Parse(accessTokenExpiration);
 
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -62,8 +75,11 @@ public class TokenService : ITokenService
 
     public RefreshToken GenerateRefreshToken(Guid userId, string ipAddress)
     {
-        var jwtSettings = _configuration.GetSection("JwtSettings");
-        var refreshTokenExpirationDays = int.Parse(jwtSettings["RefreshTokenExpirationDays"] ?? "7");
+        var refreshTokenExpiration = Environment.GetEnvironmentVariable("JWT_REFRESH_TOKEN_EXPIRATION_DAYS")
+            ?? _configuration.GetSection("JwtSettings")["RefreshTokenExpirationDays"]
+            ?? "7";
+
+        var refreshTokenExpirationDays = int.Parse(refreshTokenExpiration);
 
         // Generate cryptographically secure random token
         var randomBytes = new byte[64];
@@ -88,10 +104,17 @@ public class TokenService : ITokenService
     {
         try
         {
-            var jwtSettings = _configuration.GetSection("JwtSettings");
-            var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT Secret Key not configured");
-            var issuer = jwtSettings["Issuer"] ?? "DotnetReactTemplate";
-            var audience = jwtSettings["Audience"] ?? "DotnetReactTemplateUsers";
+            var secretKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+                ?? _configuration.GetSection("JwtSettings")["SecretKey"]
+                ?? throw new InvalidOperationException("JWT Secret Key not configured");
+
+            var issuer = Environment.GetEnvironmentVariable("JWT_ISSUER")
+                ?? _configuration.GetSection("JwtSettings")["Issuer"]
+                ?? "DotnetReactTemplate";
+
+            var audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE")
+                ?? _configuration.GetSection("JwtSettings")["Audience"]
+                ?? "DotnetReactTemplateUsers";
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var validationParameters = new TokenValidationParameters

@@ -1,8 +1,7 @@
 namespace Backend.Domain.Entities;
 
-public class PaymentMethod
+public class PaymentMethod : BaseEntity
 {
-    public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public string Provider { get; set; } = "bancard";
     public string AliasToken { get; set; } = string.Empty; // The "card token"

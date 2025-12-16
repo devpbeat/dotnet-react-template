@@ -14,10 +14,18 @@ public class ApplicationDbContext : DbContext
     public DbSet<PaymentMethod> PaymentMethods { get; set; }
     public DbSet<PaymentAttempt> PaymentAttempts { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Configure soft delete global query filters
+        modelBuilder.Entity<User>().HasQueryFilter(e => e.DeletedAt == null);
+        modelBuilder.Entity<Subscription>().HasQueryFilter(e => e.DeletedAt == null);
+        modelBuilder.Entity<PaymentMethod>().HasQueryFilter(e => e.DeletedAt == null);
+        modelBuilder.Entity<PaymentAttempt>().HasQueryFilter(e => e.DeletedAt == null);
+        modelBuilder.Entity<RefreshToken>().HasQueryFilter(e => e.DeletedAt == null);
 
         // Configure relationships and constraints here if needed
         modelBuilder.Entity<User>()

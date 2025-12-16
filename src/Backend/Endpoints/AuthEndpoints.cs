@@ -1,8 +1,8 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
+using Backend.Application.Commands;
+using Backend.Application.DTOs;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Backend.Endpoints;
 
@@ -13,65 +13,133 @@ public static class AuthEndpoints
         var group = app.MapGroup("/auth")
             .WithTags("Authentication");
 
-        group.MapPost("/login", (
-            [FromBody] LoginRequest request,
-            IConfiguration configuration) =>
+        group.MapPost("/register", async (
+            [FromBody] RegisterRequest request,
+            IMediator mediator) =>
         {
-            // TODO: Validate credentials against database
-            // This is a simplified example - implement proper user validation
-            if (string.IsNullOrEmpty(request.Email) || string.IsNullOrEmpty(request.Password))
-            {
-                return Results.BadRequest(new { message = "Email and password are required" });
-            }
+            var command = new RegisterUserCommand(request.Email, request.Password, request.FirstName, request.LastName);
+            var result = await mediator.Send(command);
+            return Results.Ok(result);
+        })
+        .WithName("Register")
+        .WithDescription("Register a new user")
+        .AllowAnonymous();
 
-            // For demo purposes, accepting any credentials
-            // In production, validate against database
-            var token = GenerateJwtToken(request.Email, configuration);
+        group.MapPost("/login", async (
+            [FromBody] LoginRequest request,
+            IMediator mediator,
+            HttpContext httpContext) =>
+        {
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var command = new LoginUserCommand(request.Email, request.Password, ipAddress);
+            var result = await mediator.Send(command);
 
-            return Results.Ok(new
+            // Set refresh token in HttpOnly cookie
+            var cookieOptions = new CookieOptions
             {
-                token,
-                expiresIn = 3600,
-                email = request.Email
-            });
+                HttpOnly = true,
+                Secure = true, // Set to true in production
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(7)
+            };
+            httpContext.Response.Cookies.Append("refresh_token", result.RefreshToken, cookieOptions);
+            
+            // Also set access token in cookie for simplicity if frontend expects it there
+            // But typically access token is returned in body for Bearer auth
+            // The previous AuthController used access_token cookie. 
+            // Let's stick to the previous behavior for compatibility with the frontend I wrote.
+            
+            var accessCookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddMinutes(15)
+            };
+            httpContext.Response.Cookies.Append("access_token", result.AccessToken, accessCookieOptions);
+
+            return Results.Ok(new { message = "Login successful", user = result.User });
         })
         .WithName("Login")
-        .WithDescription("Authenticate user and return JWT token")
+        .WithDescription("Authenticate user")
         .AllowAnonymous();
-    }
 
-    private static string GenerateJwtToken(string email, IConfiguration configuration)
-    {
-        var jwtSettings = configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT Secret Key not configured");
-        var issuer = jwtSettings["Issuer"] ?? "DotnetReactTemplate";
-        var audience = jwtSettings["Audience"] ?? "DotnetReactTemplateUsers";
-
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
-
-        var claims = new[]
+        group.MapPost("/refresh", async (
+            IMediator mediator,
+            HttpContext httpContext) =>
         {
-            new Claim(JwtRegisteredClaimNames.Sub, email),
-            new Claim(JwtRegisteredClaimNames.Email, email),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
-        };
+            var refreshToken = httpContext.Request.Cookies["refresh_token"];
+            if (string.IsNullOrEmpty(refreshToken))
+            {
+                return Results.Unauthorized();
+            }
 
-        var token = new JwtSecurityToken(
-            issuer: issuer,
-            audience: audience,
-            claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
-            signingCredentials: credentials
-        );
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var command = new RefreshTokenCommand(refreshToken, ipAddress);
+            var result = await mediator.Send(command);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+            // Update cookies
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddDays(7)
+            };
+            httpContext.Response.Cookies.Append("refresh_token", result.RefreshToken, cookieOptions);
+            
+            var accessCookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTime.UtcNow.AddMinutes(15)
+            };
+            httpContext.Response.Cookies.Append("access_token", result.AccessToken, accessCookieOptions);
+
+            return Results.Ok(new { message = "Token refreshed" });
+        })
+        .WithName("RefreshToken")
+        .WithDescription("Refresh access token using refresh token from cookie")
+        .AllowAnonymous();
+
+        group.MapPost("/logout", async (
+            IMediator mediator,
+            HttpContext httpContext) =>
+        {
+            var refreshToken = httpContext.Request.Cookies["refresh_token"];
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            if (!string.IsNullOrEmpty(refreshToken))
+            {
+                await mediator.Send(new LogoutCommand(refreshToken, ipAddress));
+            }
+
+            httpContext.Response.Cookies.Delete("refresh_token");
+            httpContext.Response.Cookies.Delete("access_token");
+            
+            return Results.Ok(new { message = "Logged out successfully" });
+        })
+        .WithName("Logout")
+        .WithDescription("Logout user")
+        .AllowAnonymous();
+
+        group.MapGet("/me", async (
+            IMediator mediator,
+            HttpContext httpContext) =>
+        {
+            var userIdClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                return Results.Unauthorized();
+            }
+
+            var result = await mediator.Send(new GetCurrentUserQuery(userId));
+            return Results.Ok(result);
+        })
+        .WithName("GetCurrentUser")
+        .WithDescription("Get current authenticated user information")
+        .RequireAuthorization();
     }
 }
 
-public class LoginRequest
-{
-    public string Email { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
-}

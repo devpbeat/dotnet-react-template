@@ -1,13 +1,11 @@
 namespace Backend.Domain.Entities;
 
-public class RefreshToken
+public class RefreshToken : BaseEntity
 {
-    public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public string Token { get; set; } = string.Empty;
     public string JwtId { get; set; } = string.Empty; // Links to the access token
     public DateTime ExpiresAt { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsRevoked { get; set; }
     public DateTime? RevokedAt { get; set; }
     public string? RevokedByIp { get; set; }

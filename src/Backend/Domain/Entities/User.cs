@@ -2,16 +2,14 @@ using Backend.Domain.Enums;
 
 namespace Backend.Domain.Entities;
 
-public class User
+public class User : BaseEntity
 {
-    public Guid Id { get; set; }
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string Role { get; set; } = "User";
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
 
     // Navigation properties

@@ -32,7 +32,4 @@ fi
 
 # Start services
 echo "Starting services..."
-$COMPOSE_CMD up --build
-
-# Trap Ctrl+C to clean up
-trap '$COMPOSE_CMD down' EXIT
+$COMPOSE_CMD up --build -d

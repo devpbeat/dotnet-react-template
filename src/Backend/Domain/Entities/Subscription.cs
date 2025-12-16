@@ -2,9 +2,8 @@ using Backend.Domain.Enums;
 
 namespace Backend.Domain.Entities;
 
-public class Subscription
+public class Subscription : BaseEntity
 {
-    public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public Plan Plan { get; set; }
     public SubscriptionStatus Status { get; set; }

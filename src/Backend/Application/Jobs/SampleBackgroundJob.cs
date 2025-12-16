@@ -70,5 +70,11 @@ public static class HangfireJobsExtensions
             "cleanup-expired-subscriptions",
             job => job.CleanupExpiredSubscriptions(),
             Cron.Daily(2));
+
+        // Cleanup expired refresh tokens every hour
+        RecurringJob.AddOrUpdate<TokenCleanupJob>(
+            "cleanup-expired-tokens",
+            job => job.CleanupExpiredTokens(),
+            Cron.Hourly);
     }
 }

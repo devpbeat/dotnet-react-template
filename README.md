@@ -5,7 +5,7 @@ This project is a modern SaaS template using:
 - **Frontend**: React (Vite + TypeScript)
 - **Backend**: ASP.NET Core Web API (.NET 10) with Minimal API Endpoints
 - **Database**: PostgreSQL (Entity Framework Core)
-- **Authentication**: JWT Bearer Tokens
+- **Authentication**: Production-Ready JWT with Refresh Tokens
 - **Background Jobs**: Hangfire
 - **CQRS**: MediatR
 - **API Documentation**: Swagger/OpenAPI
@@ -14,12 +14,18 @@ This project is a modern SaaS template using:
 
 ## Features
 - ✅ Minimal API Endpoints (no controllers)
-- ✅ JWT Authentication with Swagger integration
+- ✅ **Production-Ready JWT Authentication**
+  - Access tokens (15-min expiry)
+  - Refresh tokens with rotation (7-day expiry)
+  - PBKDF2 password hashing (100k iterations)
+  - Token revocation & IP tracking
+  - Automatic expired token cleanup
 - ✅ Hangfire dashboard for background jobs
 - ✅ MediatR for CQRS pattern
 - ✅ Docker Compose with hot reload for development
 - ✅ PostgreSQL database with EF Core
 - ✅ CORS configured for frontend
+- ✅ Swagger UI with JWT authorization
 
 ## Structure
 ```
@@ -96,41 +102,77 @@ This project is a modern SaaS template using:
 
 ## API Documentation
 
-### Authentication
-All endpoints (except /auth/login) require JWT authentication.
+### 🔐 Authentication (Production-Ready)
 
-**Login to get JWT token**:
+**Quick Start**: See [QUICK_START_AUTH.md](./QUICK_START_AUTH.md) for a 5-minute guided tutorial.
+
+**Full Guide**: See [JWT_AUTH_GUIDE.md](./JWT_AUTH_GUIDE.md) for complete documentation.
+
+#### Register & Login
+
+1. **Register** a new user:
+```bash
+curl -X POST http://localhost:8080/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"Password123!","firstName":"John","lastName":"Doe"}'
+```
+
+2. **Login** to get tokens:
 ```bash
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"password"}'
+  -d '{"email":"test@example.com","password":"Password123!"}'
 ```
 
 Response:
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIs...",
-  "expiresIn": 3600,
-  "email": "user@example.com"
+  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+  "refreshToken": "base64-encoded-refresh-token...",
+  "expiresIn": 900,
+  "tokenType": "Bearer",
+  "user": {
+    "id": "guid",
+    "email": "test@example.com",
+    "firstName": "John",
+    "lastName": "Doe",
+    "role": "User"
+  }
 }
 ```
 
-**Use token in requests**:
+3. **Use access token** in API requests:
 ```bash
-curl -X POST http://localhost:8080/billing/subscribe \
-  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+curl -X GET http://localhost:8080/auth/me \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN_HERE"
+```
+
+4. **Refresh** when access token expires (after 15 min):
+```bash
+curl -X POST http://localhost:8080/auth/refresh \
   -H "Content-Type: application/json" \
-  -d '{"userId":"...","plan":"premium"}'
+  -d '{"refreshToken":"YOUR_REFRESH_TOKEN_HERE"}'
 ```
 
 ### Available Endpoints
 
 #### Authentication
-- `POST /auth/login` - Authenticate and get JWT token
+- `POST /auth/register` - Register new user
+- `POST /auth/login` - Login and get access + refresh tokens
+- `POST /auth/refresh` - Refresh access token using refresh token
+- `POST /auth/logout` - Logout by revoking refresh token
+- `GET /auth/me` - Get current user info (requires auth)
+- `POST /auth/revoke-all` - Revoke all user's tokens (requires auth)
 
 #### Billing
 - `POST /billing/subscribe` - Create subscription (requires auth)
 - `POST /billing/webhook` - Process Bancard webhook
+
+#### Examples (MediatR + Hangfire)
+- `POST /examples/subscriptions/create` - MediatR CQRS example
+- `POST /examples/jobs/subscription-renewal` - Fire-and-forget job
+- `POST /examples/jobs/welcome-email` - Delayed job example
+- `POST /examples/subscriptions/create-with-email` - Combined MediatR + Hangfire
 
 ### Swagger UI
 Visit http://localhost:8080/swagger to:
@@ -144,9 +186,11 @@ Click "Authorize" button and enter: `Bearer YOUR_TOKEN`
 Access background jobs at: http://localhost:8080/hangfire
 
 Monitor:
-- Scheduled jobs
-- Recurring jobs
+- **Token Cleanup Job**: Automatically removes expired refresh tokens (runs hourly)
+- **Subscription Cleanup Job**: Example job (runs daily at 2 AM)
+- Scheduled and recurring jobs
 - Job history and failures
+- Real-time job execution monitoring
 
 ## MediatR Usage
 
